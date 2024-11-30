@@ -3,7 +3,15 @@ uuid = "e367a1b5-b392-4d63-99eb-4510a7b74e88"
 authors = ["Lorenzo Bertini <lorenzobertini97@gmail.com> and contributors"]
 version = "1.0.0-DEV"
 
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
+WeightInitializers = "d49dbf32-c5c2-4618-8acc-27bb2598ef2d"
+
 [compat]
+LinearAlgebra = "1.11.0"
+UnPack = "1.0.2"
+WeightInitializers = "1.0.4"
 julia = "1.11"
 
 [extras]

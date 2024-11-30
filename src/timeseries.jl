@@ -1,13 +1,11 @@
 abstract type AbstractTimeSeries{T} <: AbstractMatrix{T} end
 
-struct TimeSeries{T, V <: Vector{T}, M <: Matrix{T}}
-       <: AbstractTimeSeries{T}
+struct TimeSeries{T, V <: Vector{T}, M <: Matrix{T}} <: AbstractTimeSeries{T}
     t::V
     u::M
 end
 
-struct TimeSeriesWithStates{T, V <: Vector{T}, M <: Matrix{T}}
-       <: AbstractTimeSeries{T}
+struct TimeSeriesWithStates{T, V <: Vector{T}, M <: Matrix{T}} <: AbstractTimeSeries{T}
     t::V
     u::M
     r::M
