@@ -45,22 +45,6 @@ function Integrator(alg, rc, n_steps, output, states; dt, kwargs...)
     Integrator(0, 0.0, dt, r, h, y, cache, out, mode)
 end
 
-@inline function standard_step!(int, hidden, input, u)
-    r, h, α, Φ = int.r, int.h, hidden.α, hidden.Φ
-    put!(h, r, hidden)
-    add!(h, u, input)
-    @. r = α * Φ.(h) + (1 - α) * r
-end
-
-function perform_step!(int, alg::DiscreteDrive, rc::RC)
-    standard_step!(int, rc.hidden, rc.inputs, view(int.cache, :, int.i))
-end
-
-function perform_step!(int, alg::DiscreteAuto, rc::RC)
-    standard_step!(int, rc.hidden, rc.inputs, int.cache)
-    put!(int.cache, rc.output, int.r)
-end
-
 function step!(int, alg, rc, mode::Nothing)
     perform_step!(int, alg, rc)
 end
