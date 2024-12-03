@@ -15,6 +15,7 @@ end
 @inline Base.getindex(ts::AbstractTimeSeries, i::Int, j::Int) = ts.u[i, j]
 
 function default_members(n_dims::Int, n_steps::Int, ::Type{T}) where T
+    #fill(NaN, n_steps), fill(NaN, (n_dims, n_steps))
     Vector{T}(undef, n_steps), Matrix{T}(undef, (n_dims, n_steps))
 end
 

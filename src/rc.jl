@@ -2,12 +2,10 @@ using WeightInitializers
 using LinearAlgebra
 
 abstract type AbstractLayer end
-abstract type AbstractInputLayer <: AbstractLayer end
-abstract type AbstractOutputLayer <: AbstractLayer end
 
-struct HiddenLayer{T, F, V, M} <: AbstractLayer
+struct HiddenLayer{T, V <: AbstractVector{T}, M <: AbstractMatrix{T}} <: AbstractLayer
     α::T
-    Φ::F
+    Φ::Function
     r::V
     b::V
     W::M
@@ -26,40 +24,36 @@ function put!(dest, r, hidden::HiddenLayer)
     mul!(dest, hidden.W, r, 1.0, 1.0)
 end
 
-struct LinearOutputLayer{M} <: AbstractOutputLayer
-    Wo::M
+struct LinearLayer{T, M <: AbstractMatrix{T}} <: AbstractLayer
+    W::M
 end
 
-@inline function put!(dest, output::LinearOutputLayer, r)
-    mul!(dest, output.Wo, r)
+@inline function put!(dest, u, layer::LinearLayer)
+    mul!(dest, layer.W, u)
 end
 
-abstract type AbstractTrainingMethod end
+@inline function add!(dest, u, layer::LinearLayer)
+    mul!(dest, layer.W, u, 1.0, 1.0)
+end
 
-struct RidgeRegression{T}
+abstract type AbstractTrainMethod end
+
+struct RidgeRegression{T} <: AbstractTrainMethod
     β::T
 end
 
 RidgeRegression() = RidgeRegression(0.0)
 
-ridge_regression(r, y, β) = ((r*r' + β*I)\(r*y'))'
+ridge_reg(r, y, β) = ((r*r' + β*I)\(r*y'))'
 
-function LinearOutputLayer(rr::RidgeRegression, r::AbstractMatrix, y::AbstractMatrix)
-    Wo = ridge_regression(r, y, rr.β)
-    LinearOutputLayer(Wo)
+function train(rr::RidgeRegression, r::AbstractMatrix, y::AbstractMatrix)
+    Wo = ridge_reg(r, y, rr.β)
+    LinearLayer(Wo)
 end
 
-struct LinearInputLayer{T, M <: Matrix{T}} <: AbstractInputLayer
-    Wi::M
-end
-
-function LinearInputLayer(N, u::AbstractMatrix{MT}, σi, ::Type{T}=MT) where {T, MT}
+function randn_input_layer(N, u::AbstractMatrix{MT}, σi, ::Type{T}=MT) where {T, MT}
     Wi = σi * randn(T, (N, size(u, 1)))
-    LinearInputLayer(Wi)
-end
-
-@inline function add!(dest, u, input::LinearInputLayer)
-    mul!(dest, input.Wi, u, 1.0, 1.0)
+    LinearLayer(Wi)
 end
 
 struct RC{I, H, O}
@@ -69,14 +63,14 @@ struct RC{I, H, O}
 end
 
 function RC(N::Int, u::AbstractMatrix, y::AbstractMatrix, ::Type{T}=Float64;
-            train_method=RidgeRegression(),
+            method::AbstractTrainMethod=RidgeRegression(),
             ρ=0.02, Λ=0.8, σi=0.1, σb=1.6, α=0.6, Φ=tanh,
             kwargs...) where T
     hidden = HiddenLayer(N, ρ, Λ, σb, α, Φ, T)
-    input = LinearInputLayer(N, u, σi, T)
+    input = randn_input_layer(N, u, σi, T)
     rc = RC(input, hidden, nothing)
-    r = evolve!(rc, DiscreteDrive(), states=true, u=u)
-    output = LinearOutputLayer(train_method, r.u, y)
+    r = evolve!(rc, DiscreteDrive(), states=true, driver=u)
+    output = train(method, r.u, y)
 
     RC(input, hidden, output)
 end
