@@ -72,7 +72,7 @@ function step!(int, alg, rc, mode::OutputAndStates)
 end
 
 function integration!(int, alg, rc, mode)
-    for i in 1:int.n_steps
+    @inbounds for i in 1:int.n_steps
         int.i = i
         int.t = i * int.dt
         step!(int, alg, rc, mode)
