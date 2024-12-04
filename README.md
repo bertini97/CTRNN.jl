@@ -4,38 +4,38 @@ A reservoir computing package for Julia.
 
 ## Standard usage
 
-Here is a simple script demonstrating the usage.
+First, get some training data for autonomous mode: the same timeseries shifted by one timestep:
 ```julia
     prob = ODEProblem(lorenz!, [1.0, 0.0, 0.0], (0.0, 1000.0))
     mat = Matrix(solve(prob, dt=dt, saveat=dt, adaptive=false))
     u_train, y_train = @views mat[:, 1:end-1], mat[:, 1+1:end]
-    rc = RC(100, u_train, y_train, train_method=RidgeRegression(1e-7))
-    evolve!(rc, DiscreteDrive(), driver=u_train)
-    y_forecast = evolve!(rc, DiscreteAuto(), outout=true)
+```
+Then build the RC (an ESN in this case) from the training data:
+```julia
+rc = RC(100, u_train, y_train, method=RidgeRegression(1e-7))
+```
+For now, only `RidgeRegression` is available as training method, but you can implement your own. Then you can evolve it in time using `evolve!` and an appropriate integration algorithm. For now only `DiscreteDrive` and `DiscreteAuto` (to do a discrete map evolution) are implemented, but you can implement your own. The return type is a `TimeSeries` if `output` or `states` are set to `true`; if both are set, it return a `TimeSeriesWithStates`.
+
+## Make your own training method
+Here is the interface:
+```julia
+struct CustomTrainMethod <: AbstractTrainMethod
+train(::CustomTrainMethod, u_train, y_train)
 ```
 
 ## Make your own integration algorithm
-Declare your custom integration algorithm
+The integrator is an object containing all the necessary variables for a time step: the internal state `r`, the integration time `t`, etc. An algorithm usually employs a cache where it stores the additional variables it needs. If it needs more, you need a custom datatype (a struct). The cache is stored in the integrator. Here is the interface
 ```julia
 struct CustomAlg <: AbstractAlgorithm end
+get_n_steps(::CustomAlg; kvargs...)
+get_cache(::CustomAlg, rc::AbstractRC; kwargs...)
+perform_step!(int, ::CustomAlg, rc::AbstractRC)
 ```
-and provide the interface through the following functions.
-1. Get the number of steps from the kwargs:
-   ```julia
-    get_n_steps(alg::CustomAlg; kvargs...)
-    ```
-2. Get an integration cache (variables to store and retrieve at each step)
-   ```julia
-   get_cache(alg::CustomAlg, rc::AbstractRC; kwargs...)
-   ```
-3. Define an integration steps that updates the integrator internal state `int.r`
-   ```julia
-   perform_step!(int, alg::CustomAlg, rc::AbstractRC)
-   ```
+
 ## Make your own RC
 Declare your custom RC with custom layers
 ```julia
-struct CustomRC{I, C, H, O}
+struct CustomRC{I, C, H, O} <: AbstractRC
     input::I
     custom::C
     hidden::H
