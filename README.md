@@ -6,15 +6,20 @@ A reservoir computing package for Julia.
 
 First, get some training data for autonomous mode: the same timeseries shifted by one timestep:
 ```julia
-    prob = ODEProblem(lorenz!, [1.0, 0.0, 0.0], (0.0, 1000.0))
-    mat = Matrix(solve(prob, dt=dt, saveat=dt, adaptive=false))
-    u_train, y_train = @views mat[:, 1:end-1], mat[:, 1+1:end]
+prob = ODEProblem(lorenz!, [1.0, 0.0, 0.0], (0.0, 1000.0))
+mat = Matrix(solve(prob, dt=dt, saveat=dt, adaptive=false))
+u_train, y_train = @views mat[:, 1:end-1], mat[:, 1+1:end]
 ```
 Then build the RC (an ESN in this case) from the training data:
 ```julia
 rc = RC(100, u_train, y_train, method=RidgeRegression(1e-7))
 ```
-For now, only `RidgeRegression` is available as training method, but you can implement your own. Then you can evolve it in time using `evolve!` and an appropriate integration algorithm. For now only `DiscreteDrive` and `DiscreteAuto` (to do a discrete map evolution) are implemented, but you can implement your own. The return type is a `TimeSeries` if `output` or `states` are set to `true`; if both are set, it return a `TimeSeriesWithStates`.
+For now, only `RidgeRegression` is available as training method, but you can implement your own. Then you can evolve it in time using `evolve!` and an appropriate integration algorithm. For now only `DiscreteDrive` and `DiscreteAuto` (to do a discrete map evolution) are implemented, but you can implement your own. Examples:
+```julia
+y = evolve!(rc, DiscreteDrive(), driver=u, output=true)
+y = evolve(rc, DiscreteAuto(), n_steps=100, output=true, states=true)
+```
+The return type is a `TimeSeries` if `output` or `states` are set to `true`; if both are set, it return a `TimeSeriesWithStates`.
 
 ## Make your own training method
 Here is the interface:
