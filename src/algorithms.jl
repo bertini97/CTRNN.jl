@@ -1,30 +1,55 @@
 abstract type AbstractAlgorithm end
+abstract type AbstractDiscreteAlgorithm <: AbstractAlgorithm end
+abstract type AbstractAlgorithmCache end
 
-@inline function standard_step!(int, hidden, input, u)
-    r, h, α, Φ = int.r, int.h, hidden.α, hidden.Φ
-    put!(h, r, hidden)
-    add!(h, u, input)
-    @. r = α * Φ.(h) + (1 - α) * r
+
+struct DiscreteDrive <: AbstractDiscreteAlgorithm end
+
+struct DiscreteDriveCache{U} <: AbstractAlgorithmCache
+    u::U
 end
 
-struct DiscreteDrive <: AbstractAlgorithm end
-
-get_n_steps(alg::DiscreteDrive; driver, kvargs...) = size(driver, 2)
-get_cache(alg::DiscreteDrive, rc; driver, kwargs...) = driver
-
-function perform_step!(int, alg::DiscreteDrive, rc::RC)
-    standard_step!(int, rc.hidden, rc.inputs, view(int.cache, :, int.i))
+function alg_stuff(::DiscreteDrive, rc; driver::AbstractDiffEqArray)
+    t_start = driver.t[1]
+    n_steps = length(driver)
+    dt = (driver.t[end] - t_start) / n_steps
+    t_start, dt, n_steps, DiscreteDriveCache(driver.u)
 end
 
-struct DiscreteAuto <: AbstractAlgorithm end
+function perform_step!(int, rc, cache::DiscreteDriveCache)
+    hidden = rc.hidden
+    r = int.r
+    h = int.h
+    put_current!(h, r, hidden)
+    add_current!(h, cache.u[int.iter], rc.input)
+    put_state!(r, h, hidden)
+    copyto!(int.r, r)
+end
 
-get_n_steps(alg::DiscreteAuto; n_steps, kvargs...) = n_steps
-function get_cache(alg::DiscreteAuto, rc; kwargs...)
+
+struct DiscreteAuto <: AbstractDiscreteAlgorithm end
+
+struct DiscreteAutoCache{Y} <: AbstractAlgorithmCache
+    y::Y
+end
+
+function alg_stuff(alg::DiscreteAuto, rc; tspan::Tuple{T, T}, dt::T) where T
+    t_start, t_finish = tspan
+    n_steps = length(t_start:dt:t_finish)
     @assert !isnothing(rc.output.W)
-    rc.output.W * rc.hidden.r
+    out = get_output(rc.hidden.r, rc.output)
+    y = ndims(out) == 0 ? typeof(out)[out] : out
+    t_start, dt, n_steps, DiscreteAutoCache(y)
 end
 
-function perform_step!(int, alg::DiscreteAuto, rc::RC)
-    standard_step!(int, rc.hidden, rc.inputs, int.cache)
-    put!(int.cache, int.r, rc.output)
+function perform_step!(int, rc, cache::DiscreteAutoCache)
+    hidden = rc.hidden
+    r = int.r
+    h = int.h
+    y = cache.y
+    put_current!(h, r, hidden)
+    add_current!(h, y, rc.input)
+    put_state!(r, h, hidden)
+    copyto!(int.r, r)
+    put_output!(y, int.r, rc.output)
 end

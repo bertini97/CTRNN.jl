@@ -1,11 +1,13 @@
 using WeightInitializers
 using LinearAlgebra
 
+
 abstract type AbstractLayer end
 
-struct HiddenLayer{T, V <: AbstractVector{T}, M <: AbstractMatrix{T}} <: AbstractLayer
+
+struct HiddenLayer{T, F <: Function, V <: AbstractVector{T}, M <: AbstractMatrix{T}} <: AbstractLayer
     α::T
-    Φ::Function
+    Φ::F
     r::V
     b::V
     W::M
@@ -19,22 +21,29 @@ function HiddenLayer(N, ρ, Λ, σb, α, Φ, ::Type{T}=Float64) where T
     HiddenLayer(α, Φ, r, b, W)
 end
 
-function put!(dest, r, hidden::HiddenLayer)
-    dest .= hidden.b
-    mul!(dest, hidden.W, r, 1.0, 1.0)
+@inline function put_current!(h, r, hidden::HiddenLayer)
+    copyto!(h, hidden.b)
+    mul!(h, hidden.W, r, 1.0, 1.0)
 end
 
-struct LinearLayer{T, M <: AbstractMatrix{T}} <: AbstractLayer
-    W::M
+@inline function put_state!(r, h, hidden)
+    α = hidden.α
+    @. r = α * hidden.Φ.(h) + (1 - α) * r
 end
 
-@inline function put!(dest, u, layer::LinearLayer)
+
+struct LinearLayer{T, N, A <: AbstractArray{T, N}} <: AbstractLayer
+    W::A
+end
+
+@inline get_output(u, layer::LinearLayer) = layer.W * u
+@inline function put_output!(dest, u, layer::LinearLayer)
     mul!(dest, layer.W, u)
 end
-
-@inline function add!(dest, u, layer::LinearLayer)
+@inline function add_current!(dest, u, layer::LinearLayer)
     mul!(dest, layer.W, u, 1.0, 1.0)
 end
+
 
 abstract type AbstractTrainMethod end
 
@@ -44,33 +53,42 @@ end
 
 RidgeRegression() = RidgeRegression(0.0)
 
-ridge_reg(r, y, β) = ((r*r' + β*I)\(r*y'))'
-
-function train(rr::RidgeRegression, r::AbstractMatrix, y::AbstractMatrix)
-    Wo = ridge_reg(r, y, rr.β)
+function train(rr::RidgeRegression, r::RNNStates, y::AbstractVectorOfArray)
+    r = view(r, :, :)
+    adj_y = ndims(y) == 1 ? y.u : view(y, :, :)'
+    Wo = ((r*r' + rr.β*I)\(r*adj_y))'
     LinearLayer(Wo)
 end
 
-function randn_input_layer(N, u::AbstractMatrix{MT}, σi, ::Type{T}=MT) where {T, MT}
-    Wi = σi * randn(T, (N, size(u, 1)))
+function randn_input_layer(N, u, σi, ::Type{T}=Float64) where T
+    Wi = σi * randn(T, ndims(u) == 1 ? N : (N, size(u, 1)))
     LinearLayer(Wi)
 end
 
-struct RC{I, H, O}
-    inputs::I
+
+abstract type AbstractRC end
+
+
+struct RC{I, H, O} <: AbstractRC
+    input::I
     hidden::H
     output::O
 end
 
-function RC(N::Int, u::AbstractMatrix, y::AbstractMatrix, ::Type{T}=Float64;
-            method::AbstractTrainMethod=RidgeRegression(),
-            ρ=0.02, Λ=0.8, σi=0.1, σb=1.6, α=0.6, Φ=tanh,
-            kwargs...) where T
+function RC(N::Int, u, y, ::Type{T}=Float64;
+            u_spin=nothing, method=RidgeRegression(),
+            ρ=0.02, Λ=0.8, σi=0.1, σb=1.6, α=0.6, Φ=tanh) where T
+    
     hidden = HiddenLayer(N, ρ, Λ, σb, α, Φ, T)
     input = randn_input_layer(N, u, σi, T)
     rc = RC(input, hidden, nothing)
-    r = evolve!(rc, DiscreteDrive(), states=true, driver=u)
-    output = train(method, r.u, y)
+
+    if !isnothing(u_spin)
+        evolve!(rc, DiscreteDrive(), driver=u_spin)
+    end
+
+    sol = evolve!(rc, DiscreteDrive(), driver=u, save_states=true)
+    output = train(method, sol.r, y)
 
     RC(input, hidden, output)
 end

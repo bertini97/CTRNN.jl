@@ -1,87 +1,62 @@
-abstract type AbstractOutputMode end
-struct States <: AbstractOutputMode end
-struct Output <: AbstractOutputMode end
-struct OutputAndStates <: AbstractOutputMode end
-
-mutable struct Integrator{T, V <: Vector{T}, Y, C, O, M}
-    n_steps::Int
-    i::Int
+mutable struct Integrator{T, C, S}
+    n_steps::Int64
+    iter::Int64
     t::T
     dt::T
-    r::V
-    h::V
-    y::Y
+    t_start::T
+    r::Vector{T}
+    h::Vector{T}
     cache::C
-    out::O
-    mode::M
+    sol::S
 end
 
-function Integrator(alg, rc, output, states; dt, kwargs...)
+function Integrator(rc, alg, save_output, save_states; kwargs...)
     r = rc.hidden.r
     h = similar(r)
-    n_steps = get_n_steps(alg; kwargs...)
-    cache = get_cache(alg, rc; kwargs...)
-
-    if output
-        @assert !isnothing(rc.output)
-        y_size = size(rc.output.W, 1)
-        y = Vector{eltype(r)}(undef, y_size)
-        if states
-            out = TimeSeriesWithStates(y_size, n_steps, length(r))
-            mode = OutputAndStates()
-        else
-            out = TimeSeries(y_size, n_steps)
-            mode = Output()
-        end
+    t_start, dt, n_steps, cache = alg_stuff(alg, rc; kwargs...)
+    
+    if save_output
+        @assert !(rc.output.W isa Nothing)
+        y = get_output(r, rc.output)
+        times = eltype(r)[]
+        output = typeof(y)[]
     else
-        y = nothing
-        if states
-            out = TimeSeries(length(r), n_steps)
-            mode = States()
-        else
-            out = nothing
-            mode = nothing
-        end
+        times = nothing
+        output = nothing
     end
+    states = save_states ? RNNStates(typeof(r)[], eltype(r)[]) : nothing
+    sol = RNNOutput(output, times, states)
 
-    Integrator(n_steps, 0, 0.0, dt, r, h, y, cache, out, mode)
+    Integrator(n_steps, 0, t_start, dt, t_start, r, h, cache, sol)
 end
 
-function step!(int, alg, rc, mode::Nothing)
-    perform_step!(int, alg, rc)
-end
-
-function step!(int, alg, rc, mode::States)
-    perform_step!(int, alg, rc)
-    put!(int.out, int.i, int.t, int.r)
-end
-
-function step!(int, alg, rc, mode::Output)
-    y = int.y
-    perform_step!(int, alg, rc)
-    put!(y, int.r, rc.output)
-    put!(int.out, int.i, int.t, y)
-end
-
-function step!(int, alg, rc, mode::OutputAndStates)
-    @unpack i, r, y = int
-    perform_step!(int, alg, rc)
-    put!(y, r, rc.output)
-    put!(int.out, i, int.t, y)
-    put_r!(int.out, i, r)
-end
-
-function integration!(int, alg, rc, mode)
-    @inbounds for i in 1:int.n_steps
-        int.i = i
-        int.t = i * int.dt
-        step!(int, alg, rc, mode)
+function save_step!(int, rc)
+    sol = int.sol
+    if !(sol.u isa Nothing)
+        push!(sol.t, int.t)
+        push!(sol.u, get_output(int.r, rc.output))
+    end
+    if !(sol.r isa Nothing)
+        r = sol.r
+        push!(r.t, int.t)
+        push!(r.u, copy(int.r))
     end
 end
 
-function evolve!(rc::RC, alg::AbstractAlgorithm;
-                output=false, states=false, dt=0.01, kwargs...)
-    int = Integrator(alg, rc, output, states; dt, kwargs...)
-    integration!(int, alg, rc, int.mode)
-    int.out
+function integration!(int, rc, ::AbstractDiscreteAlgorithm)
+    for i in 1:int.n_steps
+        int.iter = i
+        int.t = int.t_start + (i-1) * int.dt
+        perform_step!(int, rc, int.cache)
+        # i == 3 && display(@code_lowered save_step!(int, rc))
+        save_step!(int, rc)
+    end
+    rc.hidden.r .= int.r
+    int.sol
+end
+
+function evolve!(rc::AbstractRC, alg::AbstractAlgorithm;
+                save_output=false, save_states=false, kwargs...)
+    int = Integrator(rc, alg, save_output, save_states; kwargs...)
+    integration!(int, rc, alg)
 end
