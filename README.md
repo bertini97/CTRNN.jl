@@ -1,3 +1,5 @@
+![A lorenz attractor](image.png)
+
 # ResComp.jl
 
 A reservoir computing package for Julia, intended to integrate nicely with [SciML](https://github.com/sciml).
