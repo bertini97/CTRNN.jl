@@ -4,7 +4,7 @@
 
 A reservoir computing package for Julia, intended to integrate nicely with [SciML](https://github.com/sciml).
 
-## Standard usage
+## Quick start
 
 As an example, it is shown how to predict trajectories for a Lorenz attractor in autonomous mode. Training data is required in the form of a time-series. An `ODESolution` will do:
 ```julia
@@ -18,7 +18,7 @@ Then build the RC (an ESN in this case) from the training data:
 ```julia
 rc = RC(200, u_train, y_train, uspin=uspin, method=RidgeRegression(1e-7))
 ```
-For now, only `RidgeRegression` is available as training method, but you can implement your own. Then you can evolve it in time using `evolve!` and an appropriate integration algorithm. For now only `DiscreteDrive` and `DiscreteAuto` (to do a discrete map evolution) are implemented, but again, you can implement your own. As an example, given a spinup series `u_spin`, the autonomous output can be obtained with:
+For now, only `RidgeRegression` is available as training method, but you can implement your own. Then you can evolve it in time using `evolve!` and an appropriate integration algorithm. For now only `DiscreteDrive` and `DiscreteAuto` (to do a discrete map evolution) are implemented, but again, you can implement your own. As an example, given a spinup series `uspin`, the autonomous output can be obtained with:
 ```julia
 evolve!(rc, DiscreteDrive(), driver=uspin)
 y = evolve(rc, DiscreteAuto(), tspan=(0.0, 100.0), dt=dt, output=true)
