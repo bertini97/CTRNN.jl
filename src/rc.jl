@@ -1,4 +1,4 @@
-using WeightInitializers
+using Distributions
 using LinearAlgebra
 
 
@@ -76,15 +76,15 @@ struct RC{I, H, O} <: AbstractRC
 end
 
 function RC(N::Int, u, y, ::Type{T}=Float64;
-            u_spin=nothing, method=RidgeRegression(),
+            uspin=nothing, method=RidgeRegression(),
             ρ=0.02, Λ=0.8, σi=0.1, σb=1.6, α=0.6, Φ=tanh) where T
     
     hidden = HiddenLayer(N, ρ, Λ, σb, α, Φ, T)
     input = randn_input_layer(N, u, σi, T)
     rc = RC(input, hidden, nothing)
 
-    if !isnothing(u_spin)
-        evolve!(rc, DiscreteDrive(), driver=u_spin)
+    if !isnothing(uspin)
+        evolve!(rc, DiscreteDrive(), driver=uspin)
     end
 
     sol = evolve!(rc, DiscreteDrive(), driver=u, save_states=true)

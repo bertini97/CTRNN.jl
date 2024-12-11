@@ -10,10 +10,10 @@ struct DiscreteDriveCache{U} <: AbstractAlgorithmCache
 end
 
 function alg_stuff(::DiscreteDrive, rc; driver::AbstractDiffEqArray)
-    t_start = driver.t[1]
-    n_steps = length(driver)
-    dt = (driver.t[end] - t_start) / n_steps
-    t_start, dt, n_steps, DiscreteDriveCache(driver.u)
+    tstart = driver.t[1]
+    nsteps = length(driver)
+    dt = (driver.t[end] - tstart) / nsteps
+    tstart, dt, nsteps, DiscreteDriveCache(driver.u)
 end
 
 function perform_step!(int, rc, cache::DiscreteDriveCache)
@@ -34,12 +34,12 @@ struct DiscreteAutoCache{Y} <: AbstractAlgorithmCache
 end
 
 function alg_stuff(alg::DiscreteAuto, rc; tspan::Tuple{T, T}, dt::T) where T
-    t_start, t_finish = tspan
-    n_steps = length(t_start:dt:t_finish)
+    tstart, t_finish = tspan
+    nsteps = length(tstart:dt:t_finish)
     @assert !isnothing(rc.output.W)
     out = get_output(rc.hidden.r, rc.output)
     y = ndims(out) == 0 ? typeof(out)[out] : out
-    t_start, dt, n_steps, DiscreteAutoCache(y)
+    tstart, dt, nsteps, DiscreteAutoCache(y)
 end
 
 function perform_step!(int, rc, cache::DiscreteAutoCache)

@@ -9,16 +9,16 @@ As an example, it is shown how to predict trajectories for a Lorenz attractor in
 dt = 0.01
 t = 100
 prob = ODEProblem(lorenz!, [1.0, 0.0, 0.0], (0.0, 1000.0))
-sol = Matrix(solve(prob, dt=dt, adaptive=false))
-u_spin, u_train, y_train = sol[1:t], sol[t+1:end-1], sol[t+2:end]
+sol = solve(prob, dt=dt, adaptive=false)
+uspin, utrain, ytrain = sol[1:t], sol[t+1:end-1], sol[t+2:end]
 ```
 Then build the RC (an ESN in this case) from the training data:
 ```julia
-rc = RC(200, u_train, y_train, u_spin=u_spin, method=RidgeRegression(1e-7))
+rc = RC(200, u_train, y_train, uspin=uspin, method=RidgeRegression(1e-7))
 ```
 For now, only `RidgeRegression` is available as training method, but you can implement your own. Then you can evolve it in time using `evolve!` and an appropriate integration algorithm. For now only `DiscreteDrive` and `DiscreteAuto` (to do a discrete map evolution) are implemented, but again, you can implement your own. As an example, given a spinup series `u_spin`, the autonomous output can be obtained with:
 ```julia
-evolve!(rc, DiscreteDrive(), driver=u_spin)
+evolve!(rc, DiscreteDrive(), driver=uspin)
 y = evolve(rc, DiscreteAuto(), tspan=(0.0, 100.0), dt=dt, output=true)
 ```
 The return type is a `RNNOutput`, a timeseries which will hold the solution if `save_ouput` was on, and a `RNNStates` timeseries if `save_states` was on.
@@ -28,7 +28,12 @@ The return type is a `RNNOutput`, a timeseries which will hold the solution if `
 Here is the interface:
 ```julia
 struct CustomTrainMethod <: AbstractTrainMethod
-train(::CustomTrainMethod, u_train, y_train)
+    # your training internal variables
+end
+
+function train(c::CustomTrainMethod, r::RNNStates, y::AbstractVectorOfArray)
+    # your training method
+end
 ```
 
 ## Make your own integration algorithm
@@ -37,7 +42,7 @@ The integrator is an object containing all the necessary variables for a time st
 ```julia
 struct CustomAlg <: AbstractDiscreteAlgorithm end
 
-struct CustomAlgCache{U} <: AbstractAlgorithmCache
+struct CustomAlgCache <: AbstractAlgorithmCache
     # your cache
 end
 
@@ -60,6 +65,10 @@ end
 
 Declare your custom RC with custom layers
 ```julia
+struct CustomLayer <: AbstractLayer
+    # your layer internals
+end
+
 struct CustomRC{I, C, H, O} <: AbstractRC
     input::I
     custom::C

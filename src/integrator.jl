@@ -1,9 +1,9 @@
 mutable struct Integrator{T, C, S}
-    n_steps::Int64
+    nsteps::Int64
     iter::Int64
     t::T
     dt::T
-    t_start::T
+    tstart::T
     r::Vector{T}
     h::Vector{T}
     cache::C
@@ -13,7 +13,7 @@ end
 function Integrator(rc, alg, save_output, save_states; kwargs...)
     r = rc.hidden.r
     h = similar(r)
-    t_start, dt, n_steps, cache = alg_stuff(alg, rc; kwargs...)
+    tstart, dt, nsteps, cache = alg_stuff(alg, rc; kwargs...)
     
     if save_output
         @assert !(rc.output.W isa Nothing)
@@ -27,7 +27,7 @@ function Integrator(rc, alg, save_output, save_states; kwargs...)
     states = save_states ? RNNStates(typeof(r)[], eltype(r)[]) : nothing
     sol = RNNOutput(output, times, states)
 
-    Integrator(n_steps, 0, t_start, dt, t_start, r, h, cache, sol)
+    Integrator(nsteps, 0, tstart, dt, tstart, r, h, cache, sol)
 end
 
 function save_step!(int, rc)
@@ -44,9 +44,9 @@ function save_step!(int, rc)
 end
 
 function integration!(int, rc, ::AbstractDiscreteAlgorithm)
-    for i in 1:int.n_steps
+    for i in 1:int.nsteps
         int.iter = i
-        int.t = int.t_start + (i-1) * int.dt
+        int.t = int.tstart + (i-1) * int.dt
         perform_step!(int, rc, int.cache)
         # i == 3 && display(@code_lowered save_step!(int, rc))
         save_step!(int, rc)
