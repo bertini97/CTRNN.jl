@@ -1,5 +1,6 @@
-using Distributions
 using LinearAlgebra
+using SparseArrays
+using ArnoldiMethod
 
 
 abstract type AbstractLayer end
@@ -16,8 +17,9 @@ end
 function HiddenLayer(N, ρ, Λ, σb, α, Φ, ::Type{T}=Float64) where T
     r = zeros(T, N)
     b = σb * randn(T, N)
-    W = sparse_init(T, N, N; sparsity=1-ρ)
-    W = W .* (Λ / maximum(abs.(eigvals(W))))
+    W = sprandn(T, N, N, ρ)
+    λ = abs(partialschur(W, nev=1)[1].eigenvalues[1])
+    W .*= (Λ / λ)
     HiddenLayer(α, Φ, r, b, W)
 end
 
