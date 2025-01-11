@@ -1,5 +1,6 @@
 abstract type AbstractAlgorithm end
 abstract type AbstractDiscreteAlgorithm <: AbstractAlgorithm end
+abstract type AbstractContinuousAlgorithm <: AbstractAlgorithm end
 abstract type AbstractAlgorithmCache end
 
 
@@ -33,7 +34,7 @@ struct DiscreteAutoCache{Y} <: AbstractAlgorithmCache
     y::Y
 end
 
-function alg_stuff(alg::DiscreteAuto, rc; tspan::Tuple{T, T}, dt::T) where T
+function alg_stuff(::DiscreteAuto, rc; tspan::Tuple{T, T}, dt::T) where T
     tstart, t_finish = tspan
     nsteps = length(tstart:dt:t_finish)
     @assert !isnothing(rc.output.W)
@@ -52,4 +53,19 @@ function perform_step!(int, rc, cache::DiscreteAutoCache)
     put_state!(r, h, hidden)
     copyto!(int.r, r)
     put_output!(y, int.r, rc.output)
+end
+
+struct ContinuousDrive <: AbstractContinuousAlgorithm end
+
+rnnfunc(::ContinuousDrive) = rnndrive!
+
+struct ContinuousAuto <: AbstractColoringAlgorithm end
+
+function alg_stuff(::ContinuousAuto, rc; tspan::Tuple{T, T}, dt::T) where T
+    tstart, t_finish = tspan
+    nsteps = length(tstart:dt:t_finish)
+    @assert !isnothing(rc.output.W)
+    out = get_output(rc.hidden.r, rc.output)
+    y = ndims(out) == 0 ? typeof(out)[out] : out
+    tstart, dt, nsteps, DiscreteAutoCache(y)
 end

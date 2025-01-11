@@ -55,7 +55,7 @@ end
 
 RidgeRegression() = RidgeRegression(0.0)
 
-function train(rr::RidgeRegression, r::RNNStates, y::AbstractVectorOfArray)
+function train(rr::RidgeRegression, r::AbstractVectorOfArray, y::AbstractVectorOfArray)
     r = view(r, :, :)
     adj_y = ndims(y) == 1 ? y.u : view(y, :, :)'
     Wo = ((r*r' + rr.β*I)\(r*adj_y))'
@@ -77,20 +77,19 @@ struct RC{I, H, O} <: AbstractRC
     output::O
 end
 
-function RC(N::Int, u, y, ::Type{T}=Float64;
+function RC(N::Int, u::AbstractDiffEqArray, y::AbstractDiffEqArray, ::Type{T}=Float64;
             uspin=nothing, method=RidgeRegression(),
-            ρ=0.02, Λ=0.8, σi=0.1, σb=1.6, α=0.6, Φ=tanh) where T
+            ρ=0.02, Λ=0.8, σi=0.1, σb=0.5, α=0.6, Φ=tanh) where T
     
     hidden = HiddenLayer(N, ρ, Λ, σb, α, Φ, T)
     input = randn_input_layer(N, u, σi, T)
     rc = RC(input, hidden, nothing)
 
     if !isnothing(uspin)
-        evolve!(rc, DiscreteDrive(), driver=uspin)
+        evolve!(rc, Driven(), dt, driver=uspin)
     end
-
-    sol = evolve!(rc, DiscreteDrive(), driver=u, save_states=true)
-    output = train(method, sol.r, y)
+    rnnout = evolve!(rc, Driven(), dt, driver=u, save_states=true)
+    output = train(method, rnnout.states, y)
 
     RC(input, hidden, output)
 end

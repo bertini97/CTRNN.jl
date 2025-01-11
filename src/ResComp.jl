@@ -1,13 +1,13 @@
 #module ResComp
 
-using SciMLBase: AbstractTimeseriesSolution
-using RecursiveArrayTools
 using LinearAlgebra
+using OrdinaryDiffEq
+using DiffEqCallbacks
+using RecursiveArrayTools
+using UnPack
 
-include("rnnsolution.jl")
 include("rc.jl")
-include("algorithms.jl")
-include("integrator.jl")
+include("evolve.jl")
 
 #export RC, RidgeRegression, DiscreteDrive, DiscreteAuto, MatWrap, VecWrap
 

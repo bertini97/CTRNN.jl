@@ -48,14 +48,14 @@ function integration!(int, rc, ::AbstractDiscreteAlgorithm)
         int.iter = i
         int.t = int.tstart + (i-1) * int.dt
         perform_step!(int, rc, int.cache)
-        # i == 3 && display(@code_lowered save_step!(int, rc))
         save_step!(int, rc)
     end
     rc.hidden.r .= int.r
     int.sol
 end
 
-function evolve!(rc::AbstractRC, alg::AbstractAlgorithm;
+
+function evolve!(rc::AbstractRC, alg::AbstractDiscreteAlgorithm;
                 save_output=false, save_states=false, kwargs...)
     int = Integrator(rc, alg, save_output, save_states; kwargs...)
     integration!(int, rc, alg)
